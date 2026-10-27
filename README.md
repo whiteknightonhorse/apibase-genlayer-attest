@@ -73,8 +73,10 @@ chain's USDC contract inside the transaction; amounts are compared as integers.
 | A transfer equals `[payer, payee, amount]` | recorded | `PASS` / `payment_matches` |
 | Transaction succeeded, no such transfer | recorded | `FAIL` / `no_matching_transfer` |
 
-A validator agrees iff `_judge` gives the same answer on its own fetches, the receipt body hashes
-(`receipt_sha256`) are equal, and the matched transfer is the same. A validator whose own fetch raises
+A validator agrees iff its own whole observation equals the leader's (receipt, `receipt_sha256`,
+`chain_found`, `tx_status`, transfers): every input is immutable by design, and the record is built
+from all of it. Verdict-only agreement was incomplete in the design (GL-00 ruling-2), not a build
+defect; the Portal steward rejected it on 2026-10-23 (D-76). A validator whose own fetch raises
 votes `False` and no verdict is made: nobody could check is not the same as the claim being false
 (CLAUDE.md invariant 1, named in the contract's docstring). `NOT_FOUND`, `FAIL` and a revert are three
 different things on purpose.
@@ -94,6 +96,8 @@ different things on purpose.
 ## Commands
 
 Run from this directory, with the isolated Python 3.12 toolchain of D-63 (the door uses `~/orchestra/glenv`):
+
+The contract's version line `# v0.2.16` must be line 1, with the `# { "Depends": ... }` line second ([why](../genlayer-witness/README.md), as of 2026-10-27).
 
 ```
 python3 scripts/check_genvm_lint.py          # genvm-lint check, with the four named E010 warnings
@@ -169,8 +173,7 @@ between two honest nodes reading the same chain (a log list that includes unrela
 events, RPC extras) and, worse, it cannot distinguish "the validator saw something different" from
 "the validator could not see anything". `_judge` below is the one deterministic function leader
 and validator both call, so the verdict rule lives in exactly one place; the validator agrees iff
-`_judge` gives the same answer on its own fetches, the receipt body hashes match, and the matched
-transfer tuple is the same.
+its whole observation equals the leader's, because the record is built from all of it (D-76).
 
 CONSENSUS SEMANTICS, NAMED EXPLICITLY. Three different outcomes must not be confused
 (CLAUDE.md invariant 1: a missing measurement is never a pass, and never silently a fail):
