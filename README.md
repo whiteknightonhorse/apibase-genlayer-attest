@@ -22,8 +22,32 @@ a consensus-backed record that the receipt and the chain agree, or that they do 
 where Provek's gates check it (D-66, beside D-63 for the first contract). The same directory is published, with its
 history, as `whiteknightonhorse/apibase-genlayer-attest` — a read-only mirror made with
 `git subtree split` (the procedure is D-64's). The mirror is never edited directly: every change enters Provek and is
-re-split. Paths such as `DECISIONS.md`, `docs/adr/` and `evidence/RED-*` refer to the root of the Provek
+re-split (D-64, second mirror). The deployed contract is this directory's `contracts/apibase_receipt_attest.py` as committed at
+`11474b4` (D-67). Paths such as `DECISIONS.md`, `docs/adr/` and `evidence/*` refer to the root of the Provek
 repository.
+
+## APIbase Receipt Attest — live on Bradbury Phase 2
+
+`ApibaseReceiptAttest` (`integrations/genlayer-apibase-attest/`) is deployed on the GenLayer test network, test GEN only. One real
+APIbase receipt has been attested there; the record is readable by anyone with `get_attestation`.
+
+| | |
+|---|---|
+| Contract | `0x1bD4C0EBC9b365905d4EBC84b944d861499afe6E` |
+| Explorer | https://explorer-bradbury.genlayer.com/address/0x1bD4C0EBC9b365905d4EBC84b944d861499afe6E |
+| Page | https://apibase.pro/attest/ (APIbase's page for this contract; APIbase moves it to this address when its promotion goes live) |
+| Network | GenLayer testnet Bradbury Phase 2 (chain 4221), RPC `https://rpc-bradbury.genlayer.com`; deployed 2026-10-28 from commit `11474b4` after GenLayer reset the testnet on 2026-10-24 (the earlier deployment died with the reset; its entry is kept in `deploy/deployment.json`, `previous_deployments`) |
+| Rail configured | `set_chain("8453", ...)`: Base mainnet, `https://mainnet.base.org`, USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+
+Live records, as of 2026-10-28 (read back with `list_by_receipt` and `get_attestation`; every field and transaction in
+`deploy/deployment.json` and `evidence/MEASURED-019-*`, the deploy and the write in `evidence/MEASURED-017-*`):
+
+| result | receipt id | observation | attested at (UTC) |
+|---|---|---|---|
+| PASS | `9dbc77f9fd66bcb8714cd064f5681005` (`myvariant.search`, 1000 atomic USDC) | `payment_matches` | 2026-10-28T09:30:52Z |
+
+Not measured: a live `FAIL` or `NOT_FOUND` record (none was requested), and a studionet integration run for this contract.
+The deployment record is `deploy/DEPLOYMENT.md`.
 
 ## The receipt: `apibase-receipt/1`
 
@@ -95,20 +119,21 @@ different things on purpose.
 
 ## Commands
 
-Run from this directory, with the isolated Python 3.12 toolchain of D-63 (the door uses `~/orchestra/glenv`):
+Run from this directory, with the isolated Python 3.12 toolchain of D-63 (the door uses `~/orchestra/glenv-babwp`, with `GENVM_VERSION=v0.6.0-rc10`, `GENVM_ALLOW_PRERELEASE=1`):
 
-The contract's version line `# v0.2.16` must be line 1, with the `# { "Depends": ... }` line second ([why](../genlayer-witness/README.md), as of 2026-10-27).
+The contract's version line `# v0.3.0` must be line 1, with the `# { "Depends": "py-genlayer:babwp9t3…" }` line second ([why](../genlayer-witness/README.md)): Bradbury Phase 2 runs the babwp runner as of 2026-10-28, and the documentation's `1jb45…` id fails there (D-79).
 
 ```
-python3 scripts/check_genvm_lint.py          # genvm-lint check, with the four named E010 warnings
+python3 scripts/check_genvm_lint.py          # genvm-lint check, with the two named E014 warnings
 python3 -m pytest tests/direct -v            # direct-mode tests: mocks only, no network
 gltest --network studionet tests/integration # live; skipped unless ATTEST_CONTRACT and APIBASE_RECEIPT_ID are set
 ```
 
 `genvm-lint check` itself has no allowlist, so `scripts/check_genvm_lint.py` runs it with `--json` and
-demands that the warning set be exactly the four known false positives: the linter's reachability check
-does not recognise the `import genlayer.gl.vm as glvm; glvm.run_nondet_unsafe(...)` alias form, so each
-of the two closures reports its `gl.nondet.web.get` and `gl.nondet.web.post` as E010. Any other shape is red.
+demands that the warning set be exactly the two known false positives: the linter (0.11.1rc2) only knows the
+v0.2 storage decorator name `allow_storage`, so it reports `ChainConfig` and `Attestation`, decorated with the
+v0.3.0 `gl.storage.allow`, as E014; its SDK-semantic validation, which builds the real schema, passes. Any
+other shape is red.
 
 `tests/fixtures/rpc_receipt_real_base_usdc.json` is a real `eth_getTransactionReceipt` answer from
 `https://mainnet.base.org` (transaction `0xa7055e5e…bf58`, block 52589696): two logs, one of them a USDC
